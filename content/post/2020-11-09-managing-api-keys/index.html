@@ -1,0 +1,76 @@
+---
+title: Managing API Keys
+author: Andy Shi
+date: '2020-11-09'
+slug: managing-api-keys
+categories:
+  - Computer Setup
+tags:
+  - HowTo
+---
+
+<script src="index_files/header-attrs/header-attrs.js"></script>
+<link href="index_files/anchor-sections/anchor-sections.css" rel="stylesheet" />
+<script src="index_files/anchor-sections/anchor-sections.js"></script>
+
+
+<p>In this post, I’ll address how I like to store and use my API keys.</p>
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<p>When using computer software to access secured resources or services, typically
+over the internet, the software usually requires an <a href="https://en.wikipedia.org/wiki/Application_programming_interface_key">API
+key</a>. The
+API key is like a password the software to authenticate itself to the resource
+or service. As an example, I’m a TA for a data science class where we use Github
+to manage students’ homework assignments. For each homework assignment, each
+student gets their own private repository that only they and the course staff
+can see. In order to create and push those repositories, the script I use,
+<a href="https://github.com/education/teachers_pet">Teacher’s pet</a> needs to authenticate
+itself to Github, and the way it does so is via an API key.</p>
+</div>
+<div id="bad-ways-to-store-api-keys" class="section level1">
+<h1>Bad ways to store API Keys</h1>
+<p>Technically, API keys should be treated like passwords, because if someone has
+your API key, they could potentially perform operations without your permission.
+In the case of the data science TA example, an unauthorized user could delete
+all the students’ homework repositories. Here are some downsides of some common
+ways API keys are stored:</p>
+<ul>
+<li><p>Environment variables: The drawback of this approach is that
+environment variables are visible to every program on your computer, and a
+malicious program could publicize these. Additionally, people sometimes
+initialize these environment variables in their <code>bashrc</code> file, which is an
+unencrypted file—if you wouldn’t store your password in an unencrypted file,
+why store your API key that way?</p></li>
+<li><p>Directly within your code: This is a big no-no, especially if you’re going to
+push your code to a public Github repository. If you accidentally push your
+API key, you’ll need to fully delete it from your history using something like
+<a href="https://rtyley.github.io/bfg-repo-cleaner/">bfg</a>, or other people will be
+able to see it.</p></li>
+</ul>
+</div>
+<div id="using-a-password-manager-for-api-keys" class="section level1">
+<h1>Using a password manager for API Keys</h1>
+<p>A lot of programs allow you to pass in the API key as a command line argument.
+If you’re writing your own program that requires an API key, make it take the
+API key as a command line argument instead of hard coding it in—this makes it
+harder for you to accidentally push the API key to Github. (NB: To parse command
+line arguments, you can use the
+<a href="https://cran.r-project.org/package=optparse">optparse</a> for R and
+<a href="https://docs.python.org/3/library/argparse.html">argparse</a> for Python).
+Therefore, you can store your API key in a password manager and copy/paste it
+when you call your program. The password manager will encrypt the API key so
+it’s more secure than storing it in an unencrypted file or your <code>bashrc</code>.
+Additionally, if you’re worried about your bash history being saved (in a
+plaintext file no less), you can prevent certain entries from being recorded.
+<a href="https://unix.stackexchange.com/questions/6094/is-there-any-way-to-keep-a-command-from-being-added-to-your-history">This Stackoverflow
+post</a>
+has solutions for both <code>bash</code> and <code>zsh</code>.</p>
+<p>Finally, if you can interface with your password manager on the command line,
+you can forgo the copy/paste step by passing the output of the password
+decryption step as a command line argument, using <a href="https://www.gnu.org/software/bash/manual/html_node/Command-Substitution.html">command
+substitution</a>.
+Here’s an example using the <a href="https://www.passwordstore.org/">pass password
+manager</a>:</p>
+<pre class="bash"><code>my_command --apikey=$(pass show api_key/Github)</code></pre>
+</div>

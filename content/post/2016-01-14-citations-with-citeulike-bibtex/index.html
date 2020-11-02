@@ -1,0 +1,119 @@
+---
+title: Citations with Citeulike + Bibtex
+author: Andy Shi
+date: '2016-01-14'
+slug: citations-with-citeulike-bibtex
+categories:
+  - Computer Setup
+tags:
+  - HowTo
+---
+
+<script src="index_files/header-attrs/header-attrs.js"></script>
+<link href="index_files/anchor-sections/anchor-sections.css" rel="stylesheet" />
+<script src="index_files/anchor-sections/anchor-sections.js"></script>
+
+
+<p>In this post, I’ll show how to automate downloading citations from Citeulike
+into BibTeX files.</p>
+<!--more-->
+<p>I’ve started writing my senior thesis, so I’ve started looking for a way to
+manage all my sources. My thesis is being written in LaTeX, so using BibTeX was
+an obvious choice. BibTeX uses a .bib file to hold information about all your
+sources: see <a href="https://en.wikibooks.org/wiki/LaTeX/Bibliography_Management">here</a>
+for more details. You can populate this .bib file by hand, but it’s easier to
+use a citation manager. I went with <a href="http://www.citeulike.org/">Citeulike</a>.</p>
+<p>You can give Citeulike a link to a journal article, a DOI, or a Pubmed ID, and
+it will automatically gather relevant information. You can export your citations
+to a .bib file, which is compatible with LaTeX. Even better, you can automate
+this retrieval process, since Citeulike allows you to access your citations
+using URLs, which can be processed with tools like wget or curl.</p>
+<p>I wrote a <a href="https://gist.github.com/shiandy/f7d53f7061748e599e10">Python script
+(link)</a> to automate
+fetching a BibTeX file for all your citations, based off <a href="http://linuxtoosx.blogspot.com/2012/10/downloadbackup-citeulike-library.html">these wget
+commands</a>.</p>
+<p>The script uses your Citeulike username and password to log in and then download
+the .bib file. You need to log in, otherwise you would only be able to access
+citation entries you made “public.” The URL for accessing the .bib file is</p>
+<pre><code>http://www.citeulike.org/bibtex/user/USERNAME</code></pre>
+<p>where USERNAME is your username.</p>
+<p>Additionally, Citeulike allows you to tag your citation entries. If you use
+Citeulike for multiple projects, you can have a tag for each project and
+download the .bib file for the project with tag TAG using the following URL:</p>
+<pre><code>http://www.citeulike.org/bibtex/user/USERNAME/tag/TAG</code></pre>
+<p>My script supports both these functions. The <code>-o</code> and <code>-t</code> arguments are
+optional but can be used to change the output filename and what tag to use.</p>
+<pre><code>usage: download_citations.py [-h] [-o OUTPUT] [-t TAG]
+
+Download bibtex citation file from citeulike.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        Bibtex output file name. Default: export.bib
+  -t TAG, --tag TAG     Which tag to use. By default, no tags are used.</code></pre>
+<p>You’ll need to set the USERNAME and PASSWORD variables to your own Citeulike
+username and password, respectively, before continuing. Using this script you
+can automate fetching those bibliography files and make sure your citations are
+up to date. Enjoy!</p>
+<p><strong>Caveat</strong>: Citeulike’s security certificate expired on June 8, 2015 and hasn’t
+been renewed since, so I am using non-secure HTTP, not HTTPS, to log in. It’s
+probably best if you use a different password for Citeulike so that people can’t
+steal your Facebook/email/bank passwords.</p>
+<pre class="python"><code>#!/usr/bin/python
+
+##########################################
+## Downloads bibtex file from Citeulike.
+## By: Andy Shi
+## For help and usage, execute
+##  python download_citations.py -h
+## Inspired by:
+## http://linuxtoosx.blogspot.com/2012/10/downloadbackup-citeulike-library.html
+##########################################
+
+import argparse
+import requests
+
+# set your Citeulike username and password here
+USERNAME = &quot;USERNAME&quot;
+PASSWORD = &quot;PASSWORD&quot;
+
+# argparse configuration
+DEFAULT_OUTPUT = &quot;export.bib&quot;
+DESCRIPTION = &quot;Download bibtex citation file from citeulike.&quot;
+
+# process command line arguments
+def handle_cli():
+    parser = argparse.ArgumentParser(description = DESCRIPTION)
+    parser.add_argument(&quot;-o&quot;, &quot;--output&quot;, default = DEFAULT_OUTPUT,
+            help = &quot;Bibtex output file name. Default: &quot; + DEFAULT_OUTPUT)
+    parser.add_argument(&quot;-t&quot;, &quot;--tag&quot;,
+            help = &quot;Which tag to use. By default, no tags are used.&quot;)
+    args = parser.parse_args()
+    return(args)
+
+def main():
+    args = handle_cli()
+    with requests.Session() as s:
+        # log in to citeulike
+        payload = {&#39;username&#39;: USERNAME, &#39;password&#39;: PASSWORD, &#39;perm&#39;: 1}
+        r_login = s.post(&quot;http://www.citeulike.org/login.do&quot;, data=payload)
+
+        if args.tag:
+            # download citations with a certain tag
+            url = \
+            &quot;http://www.citeulike.org/bibtex/user/{}/tag/{}&quot;.format(USERNAME,
+                    args.tag)
+        else:
+            # download all citations
+            url = &quot;http://www.citeulike.org/bibtex/user/{}&quot;.format(USERNAME)
+        r_bibtex = s.get(url)
+
+        # write bibtex to file
+        chunk_size = 1024
+        with open(args.output, &#39;wb&#39;) as fd:
+            for chunk in r_bibtex.iter_content(chunk_size):
+                fd.write(chunk)
+
+if __name__ == &quot;__main__&quot;:
+    main()</code></pre>
