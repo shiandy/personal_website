@@ -51,7 +51,7 @@ for thousands of data points.</p>
                                  lon = latlong_dat$Longitude[1])
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.097   0.004   1.866</code></pre>
+##   0.081   0.004  11.486</code></pre>
 </div>
 <div id="improved-solution" class="section level1">
 <h1>Improved Solution</h1>
@@ -74,7 +74,7 @@ regions.</p>
   intersected &lt;- st_intersects(latlong_sf, county_maps)
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.726   0.004   0.733</code></pre>
+##   0.742   0.024   0.766</code></pre>
 <p>We can see that this runs super quickly—it took the same time to process
 all 10K lat/long pairs with <code>st_intersects</code> as it did to process 1 pair with
 <code>call_geolocator_latlon</code>.</p>
