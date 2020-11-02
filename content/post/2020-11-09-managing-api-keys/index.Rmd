@@ -9,7 +9,7 @@ tags:
   - HowTo
 ---
 
-In this post, I'll address how I like to store and use my API keys
+In this post, I'll address how I like to store and use my API keys.
 
 # Introduction 
 
