@@ -13,23 +13,26 @@ tags:
 # Introduction
 
 A student in one of my classes had a bunch of latitude/longitude data from the
-US and wanted to map them to FIPS codes, which are codes used to identify
-individual counties in the US.
+US and wanted to map them to a US Census tract and its corresponding code (FIPS
+code).
 
-Let's first generate some fake data from Pennsylvania. We use the `us_counties`
-function from `USAboundaries` to get
-[`sf` shapefiles](https://cran.r-project.org/package=sf) of the counties.
+We can first download the Census tracts for each state from the [US Census
+website](https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html)
+under the "Census Tracts" dropdown menu. Then, after unzipping the file, we can
+read the shape file using `st_read` from the sf package.
 
-```{r gen_data, message = FALSE}
+```{r read_shape, message = FALSE}
 library(sf)
 library(dplyr)
-library(tigris)
-library(USAboundaries)
+census_tracts <- st_read("cb_2018_42_tract_500k.shp", quiet = TRUE)
+```
 
-county_maps <- us_counties(resolution = "high", states = "PA")
+Then, we can generate some fake lat/long data for Pennsylvania. 
+
+```{r gen_data, message = FALSE}
 n <- 1e5
 set.seed(7477263)
-county_bbox <- st_bbox(county_maps)
+county_bbox <- st_bbox(census_tracts)
 # randomly sample longitude and latitude from PA's bounding box
 latlong_dat <- data.frame(id = seq_len(n),
                           x = rnorm(n),
@@ -41,16 +44,18 @@ latlong_dat <- data.frame(id = seq_len(n),
 
 # Original Solution
 
-The original solution was to use `call_geolocator_latlong` to get the census
-tract using an online API, and then convert the census tract into county.
-However, the API takes a while to respond, so this solution isn't scalable
-for thousands of data points.
+The original solution was to use `call_geolocator_latlong` to get the block FIPS
+using an online API, and then convert that into Census tract by taking the first
+11 digits. However, the API takes a while to respond, so this solution isn't
+scalable for thousands of data points.
 
-```{r call_geolocator}
+```{r call_geolocator, message = FALSE}
+library(tigris)
 system.time({
-  tigris::call_geolocator_latlon(lat = latlong_dat$Latitude[1],
-                                 lon = latlong_dat$Longitude[1])
+  census_block <- tigris::call_geolocator_latlon(lat = latlong_dat$Latitude[1],
+                                                 lon = latlong_dat$Longitude[1])
 })
+(census_tract <- substr(census_block, start = 1, stop = 11))
 ```
 
 # Improved Solution
@@ -64,12 +69,12 @@ need to filter them out.
 ```{r convert}
 latlong_sf <- latlong_dat %>%
   filter(!is.na(Latitude), !is.na(Longitude)) %>%
-  st_as_sf(coords = c("Longitude", "Latitude"), crs = st_crs(county_maps))
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = st_crs(census_tracts))
 ```
 
 Then, we use the `st_intersects` function to find the counties which intersect
 with the points. This returns a list, where the ith element is the row number of
-`county_maps` which contains the ith lat/long pair.
+`census_tracts` which contains the ith lat/long pair.
 
 We might get a message like:
 
@@ -81,7 +86,7 @@ regions.
 
 ```{r intersect, message = FALSE}
 system.time({
-  intersected <- st_intersects(latlong_sf, county_maps)
+  intersected <- st_intersects(latlong_sf, census_tracts)
 })
 ```
 
@@ -89,29 +94,30 @@ We can see that this runs super quickly---it took the same time to process
 all 10K lat/long pairs with `st_intersects` as it did to process 1 pair with
 `call_geolocator_latlon`.
 
-We can then add the FIPS as a column to our latitude/longitude data. We can
-use the intersection to subset the `geoid` column of county_maps, which
-is the FIPS code. If the intersection was NA, then the FIPS code will be an
-empty string (note FIPS codes are stored as strings because sometimes they have
-a leading zero).
+We can then add the FIPS as a column to our latitude/longitude data. We can use
+the intersection to subset the `GEOID` column of `census_tracts`, which is the
+FIPS code. If the intersection was NA, then the FIPS code will be an empty
+string (note FIPS codes are stored as strings because sometimes they have a
+leading zero).
 
 ```{r latlong_final}
 latlong_final <- latlong_sf %>%
   mutate(intersection = as.integer(intersected),
          fips = if_else(is.na(intersection), "",
-                        county_maps$geoid[intersection]))
+                        census_tracts$GEOID[intersection]))
 head(latlong_final)
 ```
 
-To check our solution, we can draw a plot of all the lat/long pairs from a
-specific PA county.
+To check our solution, we can plot all the Census tracts in Philadelphia (county
+code 42101) and display the points which showed up in a particular Census tract.
 
 ```{r plot}
-county_maps %>%
+census_tracts %>%
+  filter(startsWith(GEOID, "42101")) %>%
   select(geometry) %>%
   plot()
 latlong_final %>%
-  filter(fips == "42019") %>%
+  filter(fips == "42101980300") %>%
   select(geometry) %>%
   slice_sample(n = 10) %>%
   plot(add = TRUE, reset = FALSE, pch = 16, col = "red")

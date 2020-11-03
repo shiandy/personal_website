@@ -10,7 +10,6 @@ tags:
   - Spatial
 ---
 
-<script src="index_files/header-attrs/header-attrs.js"></script>
 <link href="index_files/anchor-sections/anchor-sections.css" rel="stylesheet" />
 <script src="index_files/anchor-sections/anchor-sections.js"></script>
 
@@ -18,20 +17,19 @@ tags:
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
 <p>A student in one of my classes had a bunch of latitude/longitude data from the
-US and wanted to map them to FIPS codes, which are codes used to identify
-individual counties in the US.</p>
-<p>Let’s first generate some fake data from Pennsylvania. We use the <code>us_counties</code>
-function from <code>USAboundaries</code> to get
-<a href="https://cran.r-project.org/package=sf"><code>sf</code> shapefiles</a> of the counties.</p>
+US and wanted to map them to a US Census tract and its corresponding code (FIPS
+code).</p>
+<p>We can first download the Census tracts for each state from the <a href="https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html">US Census
+website</a>
+under the “Census Tracts” dropdown menu. Then, after unzipping the file, we can
+read the shape file using <code>st_read</code> from the sf package.</p>
 <pre class="r"><code>library(sf)
 library(dplyr)
-library(tigris)
-library(USAboundaries)
-
-county_maps &lt;- us_counties(resolution = &quot;high&quot;, states = &quot;PA&quot;)
-n &lt;- 1e5
+census_tracts &lt;- st_read(&quot;cb_2018_42_tract_500k.shp&quot;, quiet = TRUE)</code></pre>
+<p>Then, we can generate some fake lat/long data for Pennsylvania.</p>
+<pre class="r"><code>n &lt;- 1e5
 set.seed(7477263)
-county_bbox &lt;- st_bbox(county_maps)
+county_bbox &lt;- st_bbox(census_tracts)
 # randomly sample longitude and latitude from PA&#39;s bounding box
 latlong_dat &lt;- data.frame(id = seq_len(n),
                           x = rnorm(n),
@@ -42,16 +40,19 @@ latlong_dat &lt;- data.frame(id = seq_len(n),
 </div>
 <div id="original-solution" class="section level1">
 <h1>Original Solution</h1>
-<p>The original solution was to use <code>call_geolocator_latlong</code> to get the census
-tract using an online API, and then convert the census tract into county.
-However, the API takes a while to respond, so this solution isn’t scalable
-for thousands of data points.</p>
-<pre class="r"><code>system.time({
-  tigris::call_geolocator_latlon(lat = latlong_dat$Latitude[1],
-                                 lon = latlong_dat$Longitude[1])
+<p>The original solution was to use <code>call_geolocator_latlong</code> to get the block FIPS
+using an online API, and then convert that into Census tract by taking the first
+11 digits. However, the API takes a while to respond, so this solution isn’t
+scalable for thousands of data points.</p>
+<pre class="r"><code>library(tigris)
+system.time({
+  census_block &lt;- tigris::call_geolocator_latlon(lat = latlong_dat$Latitude[1],
+                                                 lon = latlong_dat$Longitude[1])
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.081   0.004  11.486</code></pre>
+##   0.059   0.004   0.602</code></pre>
+<pre class="r"><code>(census_tract &lt;- substr(census_block, start = 1, stop = 11))</code></pre>
+<pre><code>## [1] &quot;42061950500&quot;</code></pre>
 </div>
 <div id="improved-solution" class="section level1">
 <h1>Improved Solution</h1>
@@ -62,51 +63,52 @@ object. Note that if you have NA values for the latitude or longitude, you’ll
 need to filter them out.</p>
 <pre class="r"><code>latlong_sf &lt;- latlong_dat %&gt;%
   filter(!is.na(Latitude), !is.na(Longitude)) %&gt;%
-  st_as_sf(coords = c(&quot;Longitude&quot;, &quot;Latitude&quot;), crs = st_crs(county_maps))</code></pre>
+  st_as_sf(coords = c(&quot;Longitude&quot;, &quot;Latitude&quot;), crs = st_crs(census_tracts))</code></pre>
 <p>Then, we use the <code>st_intersects</code> function to find the counties which intersect
 with the points. This returns a list, where the ith element is the row number of
-<code>county_maps</code> which contains the ith lat/long pair.</p>
+<code>census_tracts</code> which contains the ith lat/long pair.</p>
 <p>We might get a message like:</p>
 <pre><code>although coordinates are longitude/latitude, st_intersects assumes that they are planar</code></pre>
 <p>I believe this can be ignored unless you’re working with data near the polar
 regions.</p>
 <pre class="r"><code>system.time({
-  intersected &lt;- st_intersects(latlong_sf, county_maps)
+  intersected &lt;- st_intersects(latlong_sf, census_tracts)
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.742   0.024   0.766</code></pre>
+##   1.062   0.008   1.070</code></pre>
 <p>We can see that this runs super quickly—it took the same time to process
 all 10K lat/long pairs with <code>st_intersects</code> as it did to process 1 pair with
 <code>call_geolocator_latlon</code>.</p>
-<p>We can then add the FIPS as a column to our latitude/longitude data. We can
-use the intersection to subset the <code>geoid</code> column of county_maps, which
-is the FIPS code. If the intersection was NA, then the FIPS code will be an
-empty string (note FIPS codes are stored as strings because sometimes they have
-a leading zero).</p>
+<p>We can then add the FIPS as a column to our latitude/longitude data. We can use
+the intersection to subset the <code>GEOID</code> column of <code>census_tracts</code>, which is the
+FIPS code. If the intersection was NA, then the FIPS code will be an empty
+string (note FIPS codes are stored as strings because sometimes they have a
+leading zero).</p>
 <pre class="r"><code>latlong_final &lt;- latlong_sf %&gt;%
   mutate(intersection = as.integer(intersected),
          fips = if_else(is.na(intersection), &quot;&quot;,
-                        county_maps$geoid[intersection]))
+                        census_tracts$GEOID[intersection]))
 head(latlong_final)</code></pre>
 <pre><code>## Simple feature collection with 6 features and 4 fields
 ## geometry type:  POINT
 ## dimension:      XY
 ## bbox:           xmin: -80.48101 ymin: 39.73635 xmax: -75.50156 ymax: 41.99468
-## geographic CRS: WGS 84
-##   id          x                   geometry intersection  fips
-## 1  1 -2.1932479 POINT (-77.89334 40.52967)            5 42061
-## 2  2 -2.0290433  POINT (-78.81608 41.8673)           44 42083
-## 3  3  0.3157029 POINT (-75.50156 39.73635)           NA      
-## 4  4 -1.0549416 POINT (-80.48101 40.59035)           38 42007
-## 5  5  0.9947392 POINT (-78.55342 41.54438)           41 42047
-## 6  6  1.2926765 POINT (-79.69076 41.99468)           17 42049</code></pre>
-<p>To check our solution, we can draw a plot of all the lat/long pairs from a
-specific PA county.</p>
-<pre class="r"><code>county_maps %&gt;%
+## geographic CRS: NAD83
+##   id          x                   geometry intersection        fips
+## 1  1 -2.1932479 POINT (-77.89334 40.52967)         2495 42061950500
+## 2  2 -2.0290433  POINT (-78.81608 41.8673)         2895 42083421000
+## 3  3  0.3157029 POINT (-75.50156 39.73635)           NA            
+## 4  4 -1.0549416 POINT (-80.48101 40.59035)         3154 42007602900
+## 5  5  0.9947392 POINT (-78.55342 41.54438)         1774 42047950100
+## 6  6  1.2926765 POINT (-79.69076 41.99468)         2609 42049011802</code></pre>
+<p>To check our solution, we can plot all the Census tracts in Philadelphia (county
+code 42101) and display the points which showed up in a particular Census tract.</p>
+<pre class="r"><code>census_tracts %&gt;%
+  filter(startsWith(GEOID, &quot;42101&quot;)) %&gt;%
   select(geometry) %&gt;%
   plot()
 latlong_final %&gt;%
-  filter(fips == &quot;42019&quot;) %&gt;%
+  filter(fips == &quot;42101980300&quot;) %&gt;%
   select(geometry) %&gt;%
   slice_sample(n = 10) %&gt;%
   plot(add = TRUE, reset = FALSE, pch = 16, col = &quot;red&quot;)</code></pre>
