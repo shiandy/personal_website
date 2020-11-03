@@ -1,5 +1,5 @@
 theme = "hugo-xmin"
-baseURL = "http://example.org/"
+baseURL = "https://shiandy.com"
 languageCode = "en-us"
 title = "Andy Shi's HomePage"
 ignoreFiles = ["\\.Rmd$", "\\.Rmarkdown$", "_cache$", "\\.knit\\.md$", "\\.utf8\\.md$"]
