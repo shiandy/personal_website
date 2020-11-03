@@ -17,3 +17,11 @@ You can find me on:
 + [Github](https://github.com/shiandy)
 + [LinkedIn](https://www.linkedin.com/in/andy-shi-b59550110/)
 + [Google Scholar](https://scholar.google.com/citations?user=A8TlK5QAAAAJ&hl=en)
+
+### Colophon
+
+This site was made using [blogdown](https://bookdown.org/yihui/blogdown/) and
+[Hugo](https://gohugo.io/). The site is hosted on
+[Netlify](https://www.netlify.com/) with the domain name provided by
+[Namecheap](https://www.namecheap.com/). The source code is available on
+[Github](https://github.com/shiandy/personal_website).
