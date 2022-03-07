@@ -16,8 +16,8 @@ engineering (CSE)](https://www.seas.harvard.edu/applied-computation/graduate-pro
 
 For more information about me, please see:
 
-+ [My CV](https://shiandy.s3.us-east-2.amazonaws.com/AndyShi_CV_Web.pdf)
-+ [My resume](https://shiandy.s3.us-east-2.amazonaws.com/AndyShi_Resume_Web.pdf)
++ [My CV](https://drive.google.com/file/d/1w_KOnNlM1bnMauJhUwaPBAZvTJODRVk5/view?usp=sharing)
++ [My resume](https://drive.google.com/file/d/1FEFdi0oVhnBls1ikgXksZ8u_BrpKucgI/view?usp=sharing)
 + [Github](https://github.com/shiandy)
 + [LinkedIn](https://www.linkedin.com/in/andy-shi-b59550110/)
 + [Google Scholar](https://scholar.google.com/citations?user=A8TlK5QAAAAJ&hl=en)
